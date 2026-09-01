@@ -73,9 +73,13 @@ jobs:
       - if: matrix.runner == 'cross'
         uses: taiki-e/install-action@cross
       - if: matrix.runner == 'cross'
-        run: cross test --locked --target ${{ matrix.target }}
+        name: Test portable suite with target runner
+        run: cross test --locked --target ${{ matrix.target }} --lib --test http
       - if: matrix.runner == 'cross'
         run: cross build --locked --release --target ${{ matrix.target }}
+      - if: matrix.runner == 'cross'
+        name: Run release binary with target runner
+        run: cross run --locked --release --target ${{ matrix.target }} -- --version
       - if: matrix.runner == 'cargo'
         run: cargo test --locked --target ${{ matrix.target }}
       - if: matrix.runner == 'cargo'
