@@ -1,0 +1,161 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  validate:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.package.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - name: Match tag to Cargo package version
+        id: package
+        shell: bash
+        run: |
+          version="$(cargo metadata --locked --no-deps --format-version 1 |
+            python3 -c 'import json, sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
+          expected_tag="v${version}"
+          if [[ "${GITHUB_REF_NAME}" != "${expected_tag}" ]]; then
+            echo "release tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${version}" >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: validate
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            runner: cross
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            runner: cross
+          - target: armv7-unknown-linux-musleabihf
+            os: ubuntu-latest
+            runner: cross
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+            runner: cargo
+          - target: aarch64-apple-darwin
+            os: macos-15
+            runner: cargo
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            runner: cargo
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@1.88.0
+        with:
+          targets: ${{ matrix.target }}
+      - if: matrix.runner == 'cross'
+        uses: taiki-e/install-action@cross
+      - if: matrix.runner == 'cross'
+        run: cross test --locked --target ${{ matrix.target }}
+      - if: matrix.runner == 'cross'
+        run: cross build --locked --release --target ${{ matrix.target }}
+      - if: matrix.runner == 'cargo'
+        run: cargo test --locked --target ${{ matrix.target }}
+      - if: matrix.runner == 'cargo'
+        run: cargo build --locked --release --target ${{ matrix.target }}
+      - name: Verify static Linux binary
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          binary="target/${{ matrix.target }}/release/autoindex-rs"
+          test -x "$binary"
+          file "$binary"
+          if readelf -l "$binary" | grep -q 'Requesting program interpreter'; then
+            echo "Linux release binary is dynamically linked" >&2
+            exit 1
+          fi
+      - name: Verify macOS binary
+        if: runner.os == 'macOS'
+        shell: bash
+        run: target/${{ matrix.target }}/release/autoindex-rs --version
+      - name: Verify Windows binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: '& "target/${{ matrix.target }}/release/autoindex-rs.exe" --version'
+      - name: Package Unix archive
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          package="autoindex-rs-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          mkdir -p "dist/$package"
+          cp "target/${{ matrix.target }}/release/autoindex-rs" README.md LICENSE "dist/$package/"
+          tar -C dist -cf - "$package" | gzip -9 > "dist/$package.tar.gz"
+          tar -tzf "dist/$package.tar.gz"
+          rm -r "dist/$package"
+      - name: Package Windows archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $package = "autoindex-rs-$env:GITHUB_REF_NAME-${{ matrix.target }}"
+          New-Item -ItemType Directory -Path "dist/$package" | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/autoindex-rs.exe", README.md, LICENSE -Destination "dist/$package/"
+          Compress-Archive -Path "dist/$package" -DestinationPath "dist/$package.zip" -CompressionLevel Optimal
+          if (-not (Test-Path "dist/$package.zip")) { throw "release archive was not created" }
+          Remove-Item -Recurse "dist/$package"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: package-${{ matrix.target }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish GitHub Release
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: package-*
+          path: dist
+          merge-multiple: true
+      - name: Create checksums
+        working-directory: dist
+        shell: bash
+        run: |
+          mapfile -t archives < <(find . -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) -printf '%f\n' | LC_ALL=C sort)
+          if [[ "${#archives[@]}" -ne 6 ]]; then
+            echo "expected 6 release archives, found ${#archives[@]}" >&2
+            printf '%s\n' "${archives[@]}" >&2
+            exit 1
+          fi
+          sha256sum "${archives[@]}" > SHA256SUMS
+          sha256sum --check SHA256SUMS
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: true
+          prerelease: ${{ contains(needs.validate.outputs.version, '-') }}
+          fail_on_unmatched_files: true
+          files: dist/*

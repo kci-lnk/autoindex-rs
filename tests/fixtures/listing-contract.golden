@@ -1,0 +1,7 @@
+<!doctype html>
+<title>Index of /</title>
+var storageKey = "autoindex-rs-theme";
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+<table class="listing-table">
+<caption class="visually-hidden">Directory contents</caption>
+<td class="empty-state" colspan="3">This directory is empty.</td>

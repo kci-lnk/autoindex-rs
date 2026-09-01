@@ -1,0 +1,25 @@
+[Unit]
+Description=autoindex-rs directory index server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/srv/public
+EnvironmentFile=-/etc/autoindex-rs.env
+ExecStart=/usr/local/bin/autoindex-rs /srv/public --bind 127.0.0.1 --port 6701
+Restart=on-failure
+RestartSec=2s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+ReadOnlyPaths=/srv/public
+
+[Install]
+WantedBy=multi-user.target
