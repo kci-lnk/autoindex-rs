@@ -179,15 +179,15 @@ CI 会在 Linux、macOS、Windows 运行检查。`v*` 标签的 Release workflow
 - `aarch64-apple-darwin`
 - `x86_64-pc-windows-msvc`
 
-Linux 产物由 `cross` 构建为静态 musl 二进制，并通过 QEMU 运行库测试、HTTP 集成测试和最终 release 二进制；需要派生子进程的配置优先级测试由 Linux、macOS、Windows 原生 CI 覆盖。Unix 发布 `.tar.gz`，Windows 发布 `.zip`，所有包包含二进制、README 和 MIT License。
+Linux 产物由 `cross` 构建为静态 musl 二进制，并通过 QEMU 运行库测试和 HTTP 集成测试；需要派生子进程的配置优先级测试由 Linux、macOS、Windows 原生 CI 覆盖。构建后还会检查 ELF 不包含动态解释器。Unix 发布 `.tar.gz`，Windows 发布 `.zip`，所有包包含二进制、README 和 MIT License。
 
 ### Release 构建与发布
 
-`.github/workflows/release.yml` 只由 `v*` 标签触发。标签必须严格等于 `v` 加 `Cargo.toml` 中的版本，例如当前版本对应 `v0.1.1`；不匹配会在构建前失败。发布前先确认主分支 CI 通过，然后创建并推送带注释标签：
+`.github/workflows/release.yml` 只由 `v*` 标签触发。标签必须严格等于 `v` 加 `Cargo.toml` 中的版本，例如当前版本对应 `v0.1.2`；不匹配会在构建前失败。发布前先确认主分支 CI 通过，然后创建并推送带注释标签：
 
 ```bash
-git tag -a v0.1.1 -m "autoindex-rs v0.1.1"
-git push origin v0.1.1
+git tag -a v0.1.2 -m "autoindex-rs v0.1.2"
+git push origin v0.1.2
 ```
 
 Release job 会测试并构建六个 target，验证 Linux ELF 没有动态解释器，检查恰好生成六个压缩包，统一生成并回验 `SHA256SUMS`，最后创建 GitHub Release。只有最终发布 job 具备 `contents: write` 权限，其余 job 保持只读。
