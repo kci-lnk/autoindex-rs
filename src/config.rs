@@ -353,6 +353,13 @@ mod tests {
         directory
     }
 
+    fn visible_tempdir() -> TempDir {
+        tempfile::Builder::new()
+            .prefix("autoindex-rs-config-test-")
+            .tempdir_in(env::current_dir().unwrap())
+            .unwrap()
+    }
+
     #[test]
     fn index_names_are_trimmed_and_deduplicated() {
         let values = normalize_index_files(vec![
@@ -373,7 +380,7 @@ mod tests {
 
     #[test]
     fn documented_defaults_are_applied() {
-        let root = TempDir::new().unwrap();
+        let root = visible_tempdir();
         let directory = visible_directory(&root);
         let config = Config::resolve_with(cli(), |_| None, directory.clone()).unwrap();
         assert_eq!(config.directory, directory.canonicalize().unwrap());
@@ -389,8 +396,8 @@ mod tests {
 
     #[test]
     fn command_line_overrides_environment() {
-        let cli_root = TempDir::new().unwrap();
-        let env_root = TempDir::new().unwrap();
+        let cli_root = visible_tempdir();
+        let env_root = visible_tempdir();
         let cli_directory = visible_directory(&cli_root);
         let env_directory = visible_directory(&env_root);
         let values = HashMap::from([
@@ -434,7 +441,7 @@ mod tests {
 
     #[test]
     fn empty_environment_index_list_disables_default_documents() {
-        let root = TempDir::new().unwrap();
+        let root = visible_tempdir();
         let directory = visible_directory(&root);
         let config = Config::resolve_with(
             cli(),
@@ -447,7 +454,7 @@ mod tests {
 
     #[test]
     fn invalid_environment_values_fail_resolution() {
-        let root = TempDir::new().unwrap();
+        let root = visible_tempdir();
         let directory = visible_directory(&root);
         for (name, value) in [
             ("AUTOINDEX_PORT", "0"),
@@ -467,7 +474,7 @@ mod tests {
 
     #[test]
     fn direct_config_values_are_revalidated_before_server_start() {
-        let root = TempDir::new().unwrap();
+        let root = visible_tempdir();
         let directory = visible_directory(&root);
         let mut config = Config::resolve_with(cli(), |_| None, directory).unwrap();
         config.page_size = 0;

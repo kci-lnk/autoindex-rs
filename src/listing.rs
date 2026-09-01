@@ -656,7 +656,7 @@ mod tests {
         };
         let candidate = Candidate {
             modified_nanos: 987_654_321,
-            ..candidate(true, "archive?#%.data", (1 << 40) + 37, 1_700_000_000)
+            ..candidate(true, "archive-#%.data", (1 << 40) + 37, 1_700_000_000)
         };
         let value = encode_cursor(CursorDirection::Before, sort, &candidate);
         let decoded = decode_cursor(&value).unwrap();

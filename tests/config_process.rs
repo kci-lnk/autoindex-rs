@@ -46,7 +46,10 @@ fn free_port() -> u16 {
 }
 
 fn fixture_workspace() -> (TempDir, std::path::PathBuf) {
-    let temporary = TempDir::new().unwrap();
+    let temporary = tempfile::Builder::new()
+        .prefix("autoindex-rs-process-test-")
+        .tempdir_in(std::env::current_dir().unwrap())
+        .unwrap();
     let workspace = temporary.path().join("workspace");
     std::fs::create_dir(&workspace).unwrap();
     (temporary, workspace)
