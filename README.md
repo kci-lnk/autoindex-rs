@@ -27,6 +27,10 @@
 
 `autoindex-rs` 把一个本地目录变成可浏览、可下载的 Web 目录。它只服务一个目录，不包含 HTTP Host 路由、子域映射、TLS/SNI、认证、gRPC 或管理后台，适合作为独立服务运行，或放在反向代理之后。
 
+[![autoindex-rs 目录索引与 GitHub 风格 README 渲染](assets/autoindex-showcase.webp)](assets/autoindex-showcase.webp)
+
+<p align="center"><sub>目录索引、文件元数据与 GitHub 风格 README 渲染</sub></p>
+
 > [!TIP]
 > 下载预编译二进制后，只需一条命令即可启动：`autoindex-rs /path/to/public`。
 
